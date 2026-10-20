@@ -90,8 +90,8 @@ button { font: inherit; color: inherit; }
 .table-wrap {
   overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
 }
-table { border-collapse: collapse; width: 100%; min-width: 860px; }
-th, td { padding: 10px 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
+table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 800px; }
+th, td { padding: 10px 10px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
 thead th {
   font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--muted); white-space: nowrap; background: var(--surface);
@@ -105,6 +105,12 @@ tbody tr:last-child td { border-bottom: 0; }
 .caret { width: 14px; color: var(--muted); transition: transform 0.15s; flex: none; }
 .ticker-btn[aria-expanded="true"] .caret { transform: rotate(90deg); }
 .symbol { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; letter-spacing: 0.02em; }
+.ticker-line { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.price { font-size: 0.88rem; font-weight: 500; }
+.score-col {
+  text-align: right; white-space: nowrap; border-left: 1px solid var(--line); padding-left: 14px;
+  position: sticky; right: 0; background: var(--surface); z-index: 1;
+}
 .company { display: block; font-size: 0.8rem; color: var(--muted); max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composite { font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .delta { font-family: var(--font-data); font-size: 0.78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -120,7 +126,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .zone.breakdown { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
 .zone.pullback, .zone.extended { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
 .zone.accumulate { background: var(--good-bg); color: var(--good); border-color: transparent; }
-.layer-cell { display: grid; gap: 4px; min-width: 64px; }
+.layer-cell { display: grid; gap: 4px; min-width: 52px; }
 .meter { height: 4px; border-radius: 2px; background: var(--neutral-bg); overflow: hidden; }
 .meter > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
 .flag { color: var(--warn); font-size: 0.78rem; font-weight: 500; white-space: nowrap; }
@@ -274,6 +280,8 @@ footer strong { color: var(--fg); }
   }
   const isNum = (v) => typeof v === "number" && Number.isFinite(v);
   const short = (layer) => config.layers[layer].label.split(" (")[0];
+  const COLUMN = { growth_quality: "Growth", sentiment: "News" };
+  const column = (layer) => COLUMN[layer] || short(layer);
   const seriesColor = (ticker) => `var(--series-${(SERIES.indexOf(ticker) % 6) + 1})`;
   const fmt = (v, d = 1) => (isNum(v) ? v.toFixed(d) : "–");
   const signed = (v, d = 1, suffix = "") => (isNum(v) ? `${v > 0 ? "+" : v < 0 ? "−" : "±"}${Math.abs(v).toFixed(d)}${suffix}` : "–");
@@ -330,12 +338,11 @@ footer strong { color: var(--fg); }
 
   function renderTable() {
     document.getElementById("rank-head").append(h("tr", {},
-      h("th", { scope: "col" }, "Ticker"),
-      h("th", { scope: "col" }, "Score"),
+      h("th", { scope: "col" }, "Ticker · Price"),
       h("th", { scope: "col" }, "Rating"),
       h("th", { scope: "col" }, "Zone"),
-      LAYERS.map((l) => h("th", { scope: "col" }, short(l))),
-      h("th", { scope: "col", style: "text-align:right" }, "Price"),
+      LAYERS.map((l) => h("th", { scope: "col", title: config.layers[l].label }, column(l))),
+      h("th", { scope: "col", class: "score-col" }, "Score"),
     ));
     const body = document.getElementById("rank-body");
     for (const r of rows) {
@@ -344,7 +351,12 @@ footer strong { color: var(--fg); }
       caret.append(s("path", { d: "M6 3l5 5-5 5", fill: "none", stroke: "currentColor", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
       const btn = h("button", { class: "ticker-btn", "aria-expanded": "false", "aria-controls": detailId },
         caret,
-        h("span", {}, h("span", { class: "symbol" }, r.ticker), h("span", { class: "company" }, r.name || "")),
+        h("span", {},
+          h("span", { class: "ticker-line" },
+            h("span", { class: "symbol" }, r.ticker),
+            h("span", { class: "num price" }, money(r.price)),
+            h("span", { class: `delta ${dirClass(r.change_1d_pct)}` }, signed(r.change_1d_pct, 2, "%"))),
+          h("span", { class: "company" }, r.name || "")),
       );
 
       const scored = r.status === "scored";
@@ -352,8 +364,6 @@ footer strong { color: var(--fg); }
         h("td", {}, btn),
         scored
           ? [
-              h("td", {}, h("div", { class: "composite" }, fmt(r.composite)),
-                h("div", { class: `delta ${dirClass(r.composite_change_1d)}` }, isNum(r.composite_change_1d) ? `${signed(r.composite_change_1d)} vs prev` : "first day")),
               h("td", {}, h("span", { class: `pill ${ratingColor(r.rating)}` }, r.rating)),
               h("td", {}, r.zone ? h("span", { class: `zone ${r.zone.current}` }, r.zone.current) : "–",
                 r.flags && r.flags.length ? h("div", { class: "flag" }, `⚑ ${r.flags.map((f) => f.replace("layer_jump:", "jump: ").replace("composite_jump", "big move")).join(", ")}`) : null),
@@ -363,13 +373,12 @@ footer strong { color: var(--fg); }
                   ? h("div", { class: "layer-cell" }, h("span", { class: "num" }, s), h("div", { class: "meter", "aria-hidden": "true" }, h("span", { style: `width:${s}%` })))
                   : h("span", { class: "muted", title: "Not enough data for this layer" }, "n/a"));
               }),
+              h("td", { class: "score-col" }, h("div", { class: "composite" }, fmt(r.composite)),
+                h("div", { class: `delta ${dirClass(r.composite_change_1d)}` }, isNum(r.composite_change_1d) ? `${signed(r.composite_change_1d)} vs prev` : "first day")),
             ]
           : h("td", { colspan: 3 + LAYERS.length, class: "muted" }, `Not scored: ${r.reason || "no data"}`),
-        h("td", { style: "text-align:right;white-space:nowrap" },
-          h("div", { class: "num" }, money(r.price)),
-          h("div", { class: `delta ${dirClass(r.change_1d_pct)}` }, signed(r.change_1d_pct, 2, "%"))),
       );
-      const detail = h("tr", { class: "detail", id: detailId, hidden: true }, h("td", { colspan: 5 + LAYERS.length }, scored ? renderDetail(r) : h("p", { class: "muted" }, r.reason || "")));
+      const detail = h("tr", { class: "detail", id: detailId, hidden: true }, h("td", { colspan: 4 + LAYERS.length }, scored ? renderDetail(r) : h("p", { class: "muted" }, r.reason || "")));
       btn.addEventListener("click", () => {
         const open = btn.getAttribute("aria-expanded") === "true";
         btn.setAttribute("aria-expanded", String(!open));
