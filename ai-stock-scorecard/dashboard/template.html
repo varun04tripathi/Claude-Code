@@ -1,0 +1,616 @@
+<title>AI Stock Scorecard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one research sheet. Header strip, the ranking table as the summary, the trend chart,
+   then the weights tool and the method notes. Color is reserved for data and state. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --fg: #121722;
+  --muted: #586273;
+  --line: #dbe0e7;
+  --accent: #2346c8;
+  --good: #0d7337;
+  --good-bg: #e2f2e7;
+  --bad: #b02a2a;
+  --bad-bg: #f8e3e1;
+  --warn: #835400;
+  --warn-bg: #faedcf;
+  --neutral-bg: #eaedf2;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1218; --surface: #161b23; --fg: #e7ebf1; --muted: #9ba6b6; --line: #2a313c; --accent: #8aa2ff;
+    --good: #63cf8d; --good-bg: #15301f; --bad: #f08b81; --bad-bg: #3b1d1b; --warn: #f0c35e; --warn-bg: #382c11; --neutral-bg: #222934;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #d55181; --series-6: #2f9e2f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1218; --surface: #161b23; --fg: #e7ebf1; --muted: #9ba6b6; --line: #2a313c; --accent: #8aa2ff;
+  --good: #63cf8d; --good-bg: #15301f; --bad: #f08b81; --bad-bg: #3b1d1b; --warn: #f0c35e; --warn-bg: #382c11; --neutral-bg: #222934;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #d55181; --series-6: #2f9e2f;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.5 var(--font-body);
+}
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 28px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; }
+h2 { font-size: 1.3rem; font-weight: 600; }
+h3 { font-size: 1rem; font-weight: 600; }
+p { margin: 0; }
+.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.eyebrow { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Header */
+.masthead { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+.masthead-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 500;
+  background: var(--neutral-bg); color: var(--fg); white-space: nowrap;
+}
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.banner {
+  padding: 12px 16px; border-radius: 8px; background: var(--warn-bg); color: var(--warn);
+  font-weight: 500; border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+}
+.section { display: grid; gap: 12px; min-width: 0; }
+.section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+
+/* Ranking table */
+.table-wrap {
+  overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+}
+table { border-collapse: collapse; width: 100%; min-width: 860px; }
+th, td { padding: 10px 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
+thead th {
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); white-space: nowrap; background: var(--surface);
+}
+tbody tr.row:hover { background: color-mix(in srgb, var(--neutral-bg) 55%, transparent); }
+tbody tr:last-child td { border-bottom: 0; }
+.ticker-btn {
+  display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0;
+  cursor: pointer; text-align: left;
+}
+.caret { width: 14px; color: var(--muted); transition: transform 0.15s; flex: none; }
+.ticker-btn[aria-expanded="true"] .caret { transform: rotate(90deg); }
+.symbol { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; letter-spacing: 0.02em; }
+.company { display: block; font-size: 0.8rem; color: var(--muted); max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composite { font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.delta { font-family: var(--font-data); font-size: 0.78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.up { color: var(--good); }
+.down { color: var(--bad); }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+.pill.pos-strong { background: var(--good); color: var(--surface); }
+.pill.pos { background: var(--good-bg); color: var(--good); }
+.pill.neutral { background: var(--neutral-bg); color: var(--fg); }
+.pill.neg { background: var(--bad-bg); color: var(--bad); }
+.pill.neg-strong { background: var(--bad); color: var(--surface); }
+.zone { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.8rem; font-weight: 500; white-space: nowrap; border: 1px solid var(--line); }
+.zone.breakdown { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+.zone.pullback, .zone.extended { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.zone.accumulate { background: var(--good-bg); color: var(--good); border-color: transparent; }
+.layer-cell { display: grid; gap: 4px; min-width: 64px; }
+.meter { height: 4px; border-radius: 2px; background: var(--neutral-bg); overflow: hidden; }
+.meter > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.flag { color: var(--warn); font-size: 0.78rem; font-weight: 500; white-space: nowrap; }
+
+/* Detail row */
+tr.detail > td { background: color-mix(in srgb, var(--neutral-bg) 40%, var(--surface)); padding: 18px 16px 22px; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px 24px; }
+.layer-box { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.layer-box h3 { display: flex; justify-content: space-between; gap: 8px; }
+.inputs { display: grid; gap: 3px; font-size: 0.83rem; }
+.inputs div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed var(--line); padding-block: 2px; }
+.inputs dt { color: var(--muted); }
+.inputs dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.inputs small { color: var(--muted); margin-left: 6px; }
+.ladder-wrap { grid-column: 1 / -1; display: grid; gap: 8px; }
+.ladder { position: relative; height: 34px; border-radius: 6px; overflow: hidden; display: flex; border: 1px solid var(--line); }
+.ladder > div { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 600; white-space: nowrap; overflow: hidden; }
+.band-breakdown { background: var(--bad-bg); color: var(--bad); }
+.band-pullback, .band-extended { background: var(--warn-bg); color: var(--warn); }
+.band-accumulate { background: var(--good-bg); color: var(--good); }
+.band-hold { background: var(--surface); color: var(--muted); }
+.ladder-track { position: relative; height: 18px; }
+.price-mark {
+  position: absolute; top: -40px; height: 40px; width: 2px; background: var(--fg); transform: translateX(-1px);
+}
+.price-label { position: absolute; top: 0; transform: translateX(-50%); font-family: var(--font-data); font-size: 0.78rem; font-weight: 500; white-space: nowrap; }
+.as-of { grid-column: 1 / -1; font-size: 0.8rem; color: var(--muted); }
+
+/* Chart */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.chart { position: relative; margin-top: 10px; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { fill: var(--muted); font: 11px var(--font-data); }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .threshold { stroke: var(--line); stroke-dasharray: 3 4; }
+.chart .crosshair { stroke: var(--muted); stroke-width: 1; }
+.tooltip {
+  position: absolute; top: 0; pointer-events: none; background: var(--surface); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 0.8rem;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--fg) 12%, transparent); min-width: 150px; display: grid; gap: 3px;
+}
+.tooltip div { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.tooltip .num { font-weight: 500; }
+
+/* Weights tool */
+.weights { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 32px; }
+@media (max-width: 720px) { .weights { grid-template-columns: minmax(0, 1fr); } }
+.sliders { display: grid; gap: 10px; }
+.slider { display: grid; grid-template-columns: 9rem minmax(0, 1fr) 3.5rem; gap: 10px; align-items: center; font-size: 0.88rem; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.slider output { text-align: right; }
+.rerank { display: grid; gap: 6px; align-content: start; }
+.rerank-row { display: grid; grid-template-columns: 1.5rem 4rem minmax(0, 1fr) 3.5rem 4rem; gap: 8px; align-items: center; font-size: 0.9rem; }
+.rerank-bar { height: 8px; border-radius: 2px; background: var(--neutral-bg); overflow: hidden; }
+.rerank-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.btn {
+  justify-self: start; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; font-size: 0.85rem; font-weight: 500;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Method */
+.method { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 32px; font-size: 0.9rem; }
+.method ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+.method p { max-width: 65ch; }
+footer { border-top: 1px solid var(--line); padding-top: 16px; font-size: 0.82rem; color: var(--muted); display: grid; gap: 4px; }
+footer strong { color: var(--fg); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main class="page" id="app">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Daily six-layer scorecard</p>
+      <h1>AI Stock Scorecard</h1>
+    </div>
+    <div class="masthead-meta" id="meta"></div>
+  </header>
+  <div class="banner" id="sample-banner" hidden>Sample data. Every price and score on this page is made up for layout testing. It is not real market data.</div>
+
+  <section class="section" aria-labelledby="rank-title">
+    <div class="section-head">
+      <h2 id="rank-title">Today's ranking</h2>
+      <p class="muted" style="font-size:0.85rem">Select a ticker to see what drives its score.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="rank-head"></thead>
+        <tbody id="rank-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="trend-title">
+    <div class="section-head">
+      <h2 id="trend-title">Composite score over time</h2>
+      <p class="muted" style="font-size:0.85rem" id="trend-range"></p>
+    </div>
+    <div class="panel">
+      <div class="legend" id="legend"></div>
+      <div class="chart" id="chart"></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="weights-title">
+    <div class="section-head">
+      <h2 id="weights-title">Try other weights</h2>
+      <p class="muted" style="font-size:0.85rem">Changes here re-rank this view only. The official scores above stay the same.</p>
+    </div>
+    <div class="panel weights">
+      <div class="sliders" id="sliders"></div>
+      <div class="rerank" id="rerank"></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="method-title">
+    <h2 id="method-title">How scores work</h2>
+    <div class="method" id="method"></div>
+  </section>
+
+  <footer id="footer"></footer>
+</main>
+
+<script>/*__ENGINE__*/</script>
+<script>/*__DATA__*/</script>
+<script>
+(function () {
+  "use strict";
+  const S = window.SCORECARD;
+  const E = window.ScoreEngine;
+  const { latest, history, config } = S;
+  const LAYERS = Object.keys(config.layers);
+  const SERIES = latest.watchlist;
+
+  // ---------- helpers ----------
+  function h(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === "class") node.className = v;
+      else if (k === "style") node.setAttribute("style", v);
+      else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of children.flat(Infinity)) if (c != null && c !== false) node.append(c.nodeType ? c : String(c));
+    return node;
+  }
+  const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+  const short = (layer) => config.layers[layer].label.split(" (")[0];
+  const seriesColor = (ticker) => `var(--series-${(SERIES.indexOf(ticker) % 6) + 1})`;
+  const fmt = (v, d = 1) => (isNum(v) ? v.toFixed(d) : "–");
+  const signed = (v, d = 1, suffix = "") => (isNum(v) ? `${v > 0 ? "+" : v < 0 ? "−" : "±"}${Math.abs(v).toFixed(d)}${suffix}` : "–");
+  const dirClass = (v) => (isNum(v) && v > 0 ? "up" : isNum(v) && v < 0 ? "down" : "muted");
+  const money = (v) => (isNum(v) ? `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "–");
+  const parseDay = (s) => new Date(`${s}T12:00:00Z`);
+  const dayLabel = (s, opts = { month: "short", day: "numeric" }) => parseDay(s).toLocaleDateString("en-US", { ...opts, timeZone: "UTC" });
+  const ratingColor = (label) => (config.ratings.find((r) => r.label === label) || {}).color || "neutral";
+
+  const INPUT_LABELS = {
+    price_vs_sma50_pct: "Price vs 50-day avg",
+    sma50_slope_20d_pct: "50-day avg, 20-day change",
+    price_vs_sma100_pct: "Price vs 100-day avg",
+    rsi14: "RSI (14)",
+    return_20d_pct: "20-day return",
+    macd_hist_pct: "MACD histogram, % of price",
+    atr14_pct: "Daily range (ATR 14), % of price",
+    volatility_20d_pct: "Volatility, 20-day annualized",
+    drawdown_from_high_pct: "Below 100-day high",
+    ForwardPE: "Forward P/E",
+    PEGRatio: "PEG ratio",
+    EVToEBITDA: "EV / EBITDA",
+    QuarterlyRevenueGrowthYOY: "Revenue growth, YoY",
+    QuarterlyEarningsGrowthYOY: "Earnings growth, YoY",
+    ProfitMargin: "Profit margin",
+    ReturnOnEquityTTM: "Return on equity",
+    avg_surprise_pct_4q: "EPS surprise, last 4 quarters",
+    weighted_sentiment_7d: "News sentiment (−1 to 1)",
+    article_count_7d: "Articles, last 7 days",
+  };
+  const RATIO_INPUTS = new Set(["QuarterlyRevenueGrowthYOY", "QuarterlyEarningsGrowthYOY", "ProfitMargin", "ReturnOnEquityTTM"]);
+  function formatInput(name, v) {
+    if (!isNum(v)) return "–";
+    if (RATIO_INPUTS.has(name)) return `${(v * 100).toFixed(1)}%`;
+    if (name.endsWith("_pct")) return `${v.toFixed(2)}%`;
+    if (name === "article_count_7d") return String(v);
+    if (name === "weighted_sentiment_7d") return v.toFixed(3);
+    return v.toFixed(name === "macd_hist_pct" ? 3 : 2);
+  }
+
+  // ---------- header ----------
+  function renderMeta() {
+    const meta = document.getElementById("meta");
+    const ageDays = Math.floor((Date.now() - parseDay(latest.market_date)) / 86400000);
+    meta.append(h("span", { class: "chip" }, "Market date ", h("strong", {}, dayLabel(latest.market_date, { month: "short", day: "numeric", year: "numeric" }))));
+    if (ageDays > 4) meta.append(h("span", { class: "chip warn" }, `Data is ${ageDays} days old`));
+    meta.append(h("span", { class: "chip" }, "Not investment advice"));
+    document.getElementById("sample-banner").hidden = !S.sample;
+  }
+
+  // ---------- ranking table ----------
+  const rows = SERIES.map((t) => ({ ticker: t, ...latest.tickers[t] }))
+    .sort((a, b) => (isNum(b.composite) ? b.composite : -1) - (isNum(a.composite) ? a.composite : -1));
+
+  function renderTable() {
+    document.getElementById("rank-head").append(h("tr", {},
+      h("th", { scope: "col" }, "Ticker"),
+      h("th", { scope: "col" }, "Score"),
+      h("th", { scope: "col" }, "Rating"),
+      h("th", { scope: "col" }, "Zone"),
+      LAYERS.map((l) => h("th", { scope: "col" }, short(l))),
+      h("th", { scope: "col", style: "text-align:right" }, "Price"),
+    ));
+    const body = document.getElementById("rank-body");
+    for (const r of rows) {
+      const detailId = `detail-${r.ticker}`;
+      const caret = s("svg", { class: "caret", viewBox: "0 0 16 16", "aria-hidden": "true" });
+      caret.append(s("path", { d: "M6 3l5 5-5 5", fill: "none", stroke: "currentColor", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+      const btn = h("button", { class: "ticker-btn", "aria-expanded": "false", "aria-controls": detailId },
+        caret,
+        h("span", {}, h("span", { class: "symbol" }, r.ticker), h("span", { class: "company" }, r.name || "")),
+      );
+
+      const scored = r.status === "scored";
+      const tr = h("tr", { class: "row" },
+        h("td", {}, btn),
+        scored
+          ? [
+              h("td", {}, h("div", { class: "composite" }, fmt(r.composite)),
+                h("div", { class: `delta ${dirClass(r.composite_change_1d)}` }, isNum(r.composite_change_1d) ? `${signed(r.composite_change_1d)} vs prev` : "first day")),
+              h("td", {}, h("span", { class: `pill ${ratingColor(r.rating)}` }, r.rating)),
+              h("td", {}, r.zone ? h("span", { class: `zone ${r.zone.current}` }, r.zone.current) : "–",
+                r.flags && r.flags.length ? h("div", { class: "flag" }, `⚑ ${r.flags.map((f) => f.replace("layer_jump:", "jump: ").replace("composite_jump", "big move")).join(", ")}`) : null),
+              LAYERS.map((l) => {
+                const s = r.layers[l].score;
+                return h("td", {}, isNum(s)
+                  ? h("div", { class: "layer-cell" }, h("span", { class: "num" }, s), h("div", { class: "meter", "aria-hidden": "true" }, h("span", { style: `width:${s}%` })))
+                  : h("span", { class: "muted", title: "Not enough data for this layer" }, "n/a"));
+              }),
+            ]
+          : h("td", { colspan: 3 + LAYERS.length, class: "muted" }, `Not scored: ${r.reason || "no data"}`),
+        h("td", { style: "text-align:right;white-space:nowrap" },
+          h("div", { class: "num" }, money(r.price)),
+          h("div", { class: `delta ${dirClass(r.change_1d_pct)}` }, signed(r.change_1d_pct, 2, "%"))),
+      );
+      const detail = h("tr", { class: "detail", id: detailId, hidden: true }, h("td", { colspan: 5 + LAYERS.length }, scored ? renderDetail(r) : h("p", { class: "muted" }, r.reason || "")));
+      btn.addEventListener("click", () => {
+        const open = btn.getAttribute("aria-expanded") === "true";
+        btn.setAttribute("aria-expanded", String(!open));
+        detail.hidden = open;
+      });
+      body.append(tr, detail);
+    }
+  }
+
+  function renderDetail(r) {
+    const grid = h("div", { class: "detail-grid" });
+    for (const l of LAYERS) {
+      const layer = config.layers[l];
+      const inputs = r.layers[l].inputs || {};
+      const names = [...new Set([...Object.keys(layer.inputs), ...Object.keys(inputs)])];
+      grid.append(h("div", { class: "layer-box" },
+        h("h3", {}, h("span", {}, layer.label), h("span", { class: "num" }, isNum(r.layers[l].score) ? r.layers[l].score : "n/a")),
+        h("dl", { class: "inputs" }, names.map((name) => {
+          const rule = layer.inputs[name];
+          const part = rule ? E.scoreInput(inputs[name], rule) : null;
+          return h("div", {},
+            h("dt", {}, INPUT_LABELS[name] || name),
+            h("dd", {}, formatInput(name, inputs[name]), isNum(part) ? h("small", { title: "Score for this input (0–100)" }, `→ ${Math.round(part)}`) : null));
+        })),
+      ));
+    }
+    if (r.zone) grid.append(renderLadder(r));
+    grid.append(h("p", { class: "as-of" }, "Data as of: " + Object.entries(r.data_as_of || {})
+      .map(([src, ts]) => `${src.replace(/_/g, " ").toLowerCase()} ${ts.slice(0, 10)}`).join(" · ")));
+    return grid;
+  }
+
+  function renderLadder(r) {
+    const z = r.zone;
+    const price = r.price;
+    const lo = Math.min(price, z.breakdown_below, z.accumulate_low) * 0.97;
+    const hi = Math.max(price, z.extended_above) * 1.03;
+    const pos = (v) => ((v - lo) / (hi - lo)) * 100;
+    // Bands in price order. Breakdown wins everywhere below the 100-day average.
+    const floor = (v) => Math.max(v, z.breakdown_below);
+    const bands = [
+      ["breakdown", lo, z.breakdown_below],
+      ["pullback", floor(lo), floor(z.accumulate_low)],
+      ["accumulate", floor(z.accumulate_low), floor(z.accumulate_high)],
+      ["hold", floor(z.accumulate_high), floor(z.extended_above)],
+      ["extended", floor(z.extended_above), hi],
+    ].filter(([, a, b]) => b > a);
+    const ladder = h("div", { class: "ladder", role: "img", "aria-label": `Price ${money(price)} is in the ${z.current} zone` },
+      bands.map(([name, a, b]) => h("div", { class: `band-${name}`, style: `width:${pos(b) - pos(a)}%`, title: `${name}: ${money(a)} – ${money(b)}` }, (pos(b) - pos(a)) > 9 ? name : "")));
+    const left = Math.min(96, Math.max(4, pos(price)));
+    return h("div", { class: "ladder-wrap" },
+      h("h3", {}, "Price zone"),
+      ladder,
+      h("div", { class: "ladder-track" },
+        h("span", { class: "price-mark", style: `left:${left}%` }),
+        h("span", { class: "price-label", style: `left:${left}%` }, `${money(price)} · ${z.current}`)),
+      h("p", { class: "muted", style: "font-size:0.8rem" },
+        `50-day avg ${money(z.sma50)} · 100-day avg ${money(z.sma100)} · ATR ${money(z.atr14)}. Accumulate ${money(z.accumulate_low)}–${money(z.accumulate_high)}, extended above ${money(z.extended_above)}.`),
+    );
+  }
+
+  // ---------- trend chart ----------
+  const SVGNS = "http://www.w3.org/2000/svg";
+  function s(tag, attrs) {
+    const node = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) node.setAttribute(k, v);
+    return node;
+  }
+
+  function renderLegend() {
+    const legend = document.getElementById("legend");
+    for (const t of SERIES) legend.append(h("span", {}, h("i", { class: "swatch", style: `background:${seriesColor(t)}` }), t));
+    if (history.length) {
+      document.getElementById("trend-range").textContent =
+        `${dayLabel(history[0].date)} – ${dayLabel(history[history.length - 1].date, { month: "short", day: "numeric", year: "numeric" })} · ${history.length} trading day${history.length === 1 ? "" : "s"}`;
+    }
+  }
+
+  function renderChart() {
+    const box = document.getElementById("chart");
+    box.replaceChildren();
+    const W = Math.max(280, box.clientWidth);
+    const H = 260;
+    const m = { top: 8, right: 10, bottom: 24, left: 30 };
+    const iw = W - m.left - m.right;
+    const ih = H - m.top - m.bottom;
+    const n = history.length;
+    if (!n) {
+      box.append(h("p", { class: "muted" }, "The chart fills in as daily history builds up."));
+      return;
+    }
+    const x = (i) => m.left + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
+    const y = (v) => m.top + (1 - v / 100) * ih;
+    const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": "Composite score per ticker over time, 0 to 100" });
+
+    // Grid at 0, 100 and the rating thresholds, so the bands are readable from the chart itself.
+    const thresholds = config.ratings.map((r) => r.min).filter((v) => v > 0);
+    for (const v of [0, ...thresholds, 100]) {
+      svg.append(s("line", { x1: m.left, x2: W - m.right, y1: y(v), y2: y(v), class: v === 0 || v === 100 ? "grid" : "threshold" }));
+      const label = s("text", { x: m.left - 6, y: y(v) + 4, "text-anchor": "end" });
+      label.textContent = v;
+      svg.append(label);
+    }
+    const ticks = n === 1 ? [0] : [...new Set([0, Math.round((n - 1) / 2), n - 1])];
+    for (const i of ticks) {
+      const t = s("text", { x: x(i), y: H - 6, "text-anchor": i === 0 && n > 1 ? "start" : i === n - 1 && n > 1 ? "end" : "middle" });
+      t.textContent = dayLabel(history[i].date);
+      svg.append(t);
+    }
+
+    for (const t of SERIES) {
+      let d = "";
+      let pen = false;
+      history.forEach((day, i) => {
+        const v = day.tickers[t] && day.tickers[t].composite;
+        if (isNum(v)) { d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; pen = true; } else pen = false;
+      });
+      if (d) svg.append(s("path", { d, fill: "none", stroke: seriesColor(t), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      const last = history[n - 1].tickers[t];
+      if (last && isNum(last.composite)) {
+        svg.append(s("circle", { cx: x(n - 1), cy: y(last.composite), r: 4, fill: seriesColor(t), stroke: "var(--surface)", "stroke-width": 2 }));
+      }
+    }
+
+    // Hover: crosshair, a dot per series, tooltip sorted by value.
+    const cross = s("line", { y1: m.top, y2: m.top + ih, class: "crosshair", visibility: "hidden" });
+    const dots = s("g", { visibility: "hidden" });
+    svg.append(cross, dots);
+    const hit = s("rect", { x: m.left, y: 0, width: iw, height: H, fill: "transparent" });
+    svg.append(hit);
+    const tip = h("div", { class: "tooltip", hidden: true });
+    box.append(svg, tip);
+
+    function show(evt) {
+      const rect = svg.getBoundingClientRect();
+      const px = ((evt.clientX - rect.left) / rect.width) * W;
+      const i = n === 1 ? 0 : Math.max(0, Math.min(n - 1, Math.round(((px - m.left) / iw) * (n - 1))));
+      const day = history[i];
+      cross.setAttribute("x1", x(i));
+      cross.setAttribute("x2", x(i));
+      cross.setAttribute("visibility", "visible");
+      dots.replaceChildren();
+      const values = SERIES.map((t) => [t, day.tickers[t] && day.tickers[t].composite]).filter(([, v]) => isNum(v)).sort((a, b) => b[1] - a[1]);
+      for (const [t, v] of values) dots.append(s("circle", { cx: x(i), cy: y(v), r: 4, fill: seriesColor(t), stroke: "var(--surface)", "stroke-width": 2 }));
+      dots.setAttribute("visibility", "visible");
+      tip.replaceChildren(h("strong", {}, dayLabel(day.date, { weekday: "short", month: "short", day: "numeric" })),
+        values.map(([t, v]) => h("div", {}, h("span", {}, h("i", { class: "swatch", style: `background:${seriesColor(t)};margin-right:6px` }), t), h("span", { class: "num" }, v.toFixed(1)))));
+      tip.hidden = false;
+      const left = (x(i) / W) * rect.width;
+      const tw = tip.offsetWidth;
+      tip.style.left = `${left + 14 + tw > rect.width ? Math.max(0, left - 14 - tw) : left + 14}px`;
+      tip.style.top = "8px";
+    }
+    function hide() {
+      cross.setAttribute("visibility", "hidden");
+      dots.setAttribute("visibility", "hidden");
+      tip.hidden = true;
+    }
+    hit.addEventListener("pointermove", show);
+    hit.addEventListener("pointerdown", show);
+    hit.addEventListener("pointerleave", hide);
+  }
+
+  // ---------- weights tool ----------
+  const defaults = Object.fromEntries(LAYERS.map((l) => [l, Math.round(config.layers[l].weight * 100)]));
+  const weights = { ...defaults };
+
+  function renderSliders() {
+    const box = document.getElementById("sliders");
+    for (const l of LAYERS) {
+      const id = `w-${l}`;
+      const input = h("input", { type: "range", id, min: 0, max: 50, step: 5, value: weights[l] });
+      const out = h("output", { class: "num", for: id });
+      input.addEventListener("input", () => { weights[l] = Number(input.value); updateWeights(); });
+      box.append(h("label", { class: "slider", for: id }, h("span", {}, short(l)), input, out));
+    }
+    box.append(h("button", { class: "btn", type: "button", onclick: () => {
+      Object.assign(weights, defaults);
+      for (const l of LAYERS) document.getElementById(`w-${l}`).value = weights[l];
+      updateWeights();
+    } }, "Reset to official weights"));
+    updateWeights();
+  }
+
+  function updateWeights() {
+    const total = LAYERS.reduce((sum, l) => sum + weights[l], 0);
+    for (const l of LAYERS) {
+      const out = document.querySelector(`output[for="w-${l}"]`);
+      out.textContent = total ? `${Math.round((weights[l] / total) * 100)}%` : "0%";
+    }
+    const ranked = rows.filter((r) => r.status === "scored").map((r) => {
+      const scores = Object.fromEntries(LAYERS.map((l) => [l, r.layers[l].score]));
+      return { ticker: r.ticker, official: r.composite, custom: total ? E.composite(scores, config, weights) : null };
+    }).sort((a, b) => (b.custom ?? -1) - (a.custom ?? -1));
+    const box = document.getElementById("rerank");
+    box.replaceChildren(h("div", { class: "rerank-row eyebrow" }, h("span", {}, "#"), h("span", {}, "Ticker"), h("span", {}, "Your weights"), h("span", { style: "text-align:right" }, "Score"), h("span", { style: "text-align:right" }, "Change")));
+    ranked.forEach((r, i) => {
+      const diff = isNum(r.custom) && isNum(r.official) ? r.custom - r.official : null;
+      box.append(h("div", { class: "rerank-row" },
+        h("span", { class: "muted num" }, i + 1),
+        h("span", { class: "symbol", style: "font-size:1rem" }, r.ticker),
+        h("div", { class: "rerank-bar", "aria-hidden": "true" }, h("span", { style: `width:${isNum(r.custom) ? r.custom : 0}%` })),
+        h("span", { class: "num", style: "text-align:right" }, fmt(r.custom)),
+        h("span", { class: `delta ${dirClass(diff)}`, style: "text-align:right" }, Math.abs(diff ?? 0) < 0.05 ? "same" : signed(diff))));
+    });
+    if (!total) box.append(h("p", { class: "muted" }, "Give at least one layer some weight."));
+  }
+
+  // ---------- method & footer ----------
+  function renderMethod() {
+    const box = document.getElementById("method");
+    box.append(h("div", {},
+      h("h3", {}, "Six layers"),
+      h("ul", {}, LAYERS.map((l) => h("li", {}, h("strong", {}, `${config.layers[l].label}, ${Math.round(config.layers[l].weight * 100)}%`), ": ",
+        Object.keys(config.layers[l].inputs).map((k) => INPUT_LABELS[k] || k).join(", "))))));
+    box.append(h("div", { style: "display:grid;gap:10px;align-content:start" },
+      h("h3", {}, "From inputs to a rating"),
+      h("p", {}, "Each input is placed on a 0–100 scale between a weak and a strong reference value. A layer's score is the average of its inputs, and the composite is the weighted average of the six layers. If one layer has no data, its weight is shared by the others; with two missing, the ticker is not scored."),
+      h("p", {}, "Ratings: " + config.ratings.map((r) => `${r.label} ${r.min}+`).join(" · ") + ".")));
+    box.append(h("div", { style: "display:grid;gap:10px;align-content:start" },
+      h("h3", {}, "Price zones"),
+      h("p", {}, `Zones are measured around the 50-day average in units of average true range (ATR). Accumulate is up to ${config.zones.accumulate_atr_below} ATR below the average, hold is from the average to ${config.zones.extended_atr_above} ATR above it, and extended is beyond that. Pullback is further below, and breakdown means the price is under its 100-day average.`)));
+  }
+
+  function renderFooter() {
+    document.getElementById("footer").append(
+      h("p", {}, h("strong", {}, "Not investment advice. "), "Scores are computed by code from public market data and can be wrong or out of date."),
+      h("p", {}, `Data: Alpha Vantage. Generated ${latest.generated_at.replace("T", " ").replace("Z", " UTC")} · engine ${latest.engine_version} · scoring config ${latest.scoring_config_version}`));
+  }
+
+  renderMeta();
+  renderTable();
+  renderLegend();
+  renderChart();
+  renderSliders();
+  renderMethod();
+  renderFooter();
+  let chartWidth = document.getElementById("chart").clientWidth;
+  new ResizeObserver(([entry]) => {
+    const width = Math.round(entry.contentRect.width);
+    if (width !== chartWidth) { chartWidth = width; renderChart(); }
+  }).observe(document.getElementById("chart"));
+})();
+</script>

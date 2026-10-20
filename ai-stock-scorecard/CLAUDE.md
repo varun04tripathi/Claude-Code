@@ -5,6 +5,7 @@
 - Each run writes data/latest.json AND data/history/<YYYY-MM-DD>.json, then commits and pushes them.
 - Files under data/ are written only by pipeline scripts. Never edit them by hand; fix the script and re-run instead.
 - docs/data-format.md defines all data file formats. Follow it exactly; update it (and bump schema_version) in the same commit as any format change.
-- Publish target: (not published yet) — once published, always update that URL, never create a new one.
+- Publish target: https://claude.ai/artifact/NuHjUvryeUR23mAMfJ7qT8 — always update this URL (publish dist/index.html with `url`), never create a new one.
+- Build the page with `python pipeline/build.py`. `--sample` (with `pipeline/make_sample.py`) is for made-up layout-test data only; never publish real scores with the sample banner, or sample data without it.
 - The page must show "Not investment advice" and the data timestamp.
 - The API key comes from $ALPHAVANTAGE_API_KEY. Never print it or commit it.
