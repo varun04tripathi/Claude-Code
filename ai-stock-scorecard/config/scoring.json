@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "layers": {
+    "trend": {
+      "weight": 0.20,
+      "label": "Trend",
+      "source": "TIME_SERIES_DAILY",
+      "inputs": ["price_vs_sma50_pct", "sma50_slope_20d_pct", "price_vs_sma100_pct"]
+    },
+    "momentum": {
+      "weight": 0.15,
+      "label": "Momentum",
+      "source": "TIME_SERIES_DAILY",
+      "inputs": ["rsi14", "return_20d_pct", "macd_hist"]
+    },
+    "risk": {
+      "weight": 0.15,
+      "label": "Risk (lower is better)",
+      "source": "TIME_SERIES_DAILY",
+      "inputs": ["atr14_pct", "volatility_20d_pct", "drawdown_from_high_pct"]
+    },
+    "valuation": {
+      "weight": 0.20,
+      "label": "Valuation",
+      "source": "OVERVIEW",
+      "inputs": ["ForwardPE", "PEGRatio", "EVToEBITDA"]
+    },
+    "growth_quality": {
+      "weight": 0.20,
+      "label": "Growth & Quality",
+      "source": "OVERVIEW + EARNINGS",
+      "inputs": ["QuarterlyRevenueGrowthYOY", "QuarterlyEarningsGrowthYOY", "ProfitMargin", "ReturnOnEquityTTM", "avg_surprise_pct_4q"]
+    },
+    "sentiment": {
+      "weight": 0.10,
+      "label": "News Sentiment",
+      "source": "NEWS_SENTIMENT",
+      "inputs": ["weighted_sentiment_7d", "article_count_7d"]
+    }
+  },
+  "missing_layer_policy": "renormalize",
+  "max_missing_layers": 1,
+  "zones": {
+    "atr_period": 14,
+    "anchor": "sma50",
+    "accumulate_atr_below": 1.0,
+    "extended_atr_above": 2.0,
+    "breakdown_anchor": "sma100"
+  },
+  "ratings": [
+    { "min": 75, "label": "Strong",   "color": "pos-strong" },
+    { "min": 60, "label": "Positive", "color": "pos" },
+    { "min": 40, "label": "Neutral",  "color": "neutral" },
+    { "min": 25, "label": "Weak",     "color": "neg" },
+    { "min": 0,  "label": "Avoid",    "color": "neg-strong" }
+  ],
+  "alerts": {
+    "composite_change_pts": 10,
+    "layer_change_pts": 30
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python pipeline/fetch.py:*)",
+      "Bash(python pipeline/compute.py:*)",
+      "Bash(python pipeline/build.py:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(node engine/score.js:*)",
+      "Bash(npm test:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git add data/:*)",
+      "Bash(git add watchlist.json:*)",
+      "Bash(git commit:*)",
+      "Bash(git push origin main:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(rm -rf:*)",
+      "Edit(data/**)",
+      "Write(data/**)"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+# AI Stock Scorecard — rules
+- Scores are computed ONLY by code (engine/score.js via pipeline/compute.py). Never invent, round, or "adjust" a number by hand.
+- Pipeline order: fetch.py → compute.py → build.py. Stop and report if any step fails; never publish stale or partial data.
+- Raw API responses go to data/raw/<date>/ with a fetched_at timestamp.
+- Each run writes data/latest.json AND data/history/<YYYY-MM-DD>.json, then commits and pushes them.
+- Files under data/ are written only by pipeline scripts. Never edit them by hand; fix the script and re-run instead.
+- docs/data-format.md defines all data file formats. Follow it exactly; update it (and bump schema_version) in the same commit as any format change.
+- Publish target: (not published yet) — once published, always update that URL, never create a new one.
+- The page must show "Not investment advice" and the data timestamp.
+- The API key comes from $ALPHAVANTAGE_API_KEY. Never print it or commit it.

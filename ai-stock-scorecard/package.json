@@ -1,0 +1,11 @@
+{
+  "name": "ai-stock-scorecard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daily six-layer scorecard for an AI-focused stock watchlist",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test tests/",
+    "score": "node engine/score.js"
+  }
+}
