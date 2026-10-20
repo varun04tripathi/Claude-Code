@@ -57,22 +57,38 @@ Each layer is `{ "score": 0–100, "inputs": { ... } }`.
 | Layer | Source | Inputs |
 |---|---|---|
 | `trend` | TIME_SERIES_DAILY | `price_vs_sma50_pct`, `sma50_slope_20d_pct`, `price_vs_sma100_pct` |
-| `momentum` | TIME_SERIES_DAILY | `rsi14`, `return_20d_pct`, `macd_hist` |
-| `risk` | TIME_SERIES_DAILY | `atr14_pct`, `volatility_20d_pct`, `drawdown_from_high_pct` (higher score = lower risk) |
+| `momentum` | TIME_SERIES_DAILY | `rsi14`, `return_20d_pct`, `macd_hist_pct` (MACD histogram as % of price) |
+| `risk` | TIME_SERIES_DAILY | `atr14_pct`, `volatility_20d_pct` (annualized), `drawdown_from_high_pct` (vs highest close in the last 100 days); higher score = lower risk |
 | `valuation` | OVERVIEW | `ForwardPE`, `PEGRatio`, `EVToEBITDA` |
-| `growth_quality` | OVERVIEW + EARNINGS | `QuarterlyRevenueGrowthYOY`, `QuarterlyEarningsGrowthYOY`, `ProfitMargin`, `ReturnOnEquityTTM`, `avg_surprise_pct_4q` |
-| `sentiment` | NEWS_SENTIMENT | `weighted_sentiment_7d`, `article_count_7d` |
+| `growth_quality` | OVERVIEW + EARNINGS | `QuarterlyRevenueGrowthYOY`, `QuarterlyEarningsGrowthYOY`, `ProfitMargin`, `ReturnOnEquityTTM`, `avg_surprise_pct_4q` (last 4 reported quarters, each clipped to ±50%) |
+| `sentiment` | NEWS_SENTIMENT | `weighted_sentiment_7d` (relevance-weighted, −1 to 1), `article_count_7d` |
 
 ### Zone (`zone`)
 
 | Field | Meaning |
 |---|---|
-| `current` | One of `accumulate`, `hold`, `extended`, `breakdown`. |
+| `current` | First match of: `breakdown` (below sma100), `extended` (above `extended_above`), `hold` (at or above sma50), `accumulate` (at or above `accumulate_low`), else `pullback`. |
 | `sma50`, `sma100` | 50- and 100-day simple moving averages. |
 | `atr14` | 14-day average true range. |
 | `accumulate_low` / `accumulate_high` | sma50 − 1×ATR to sma50. |
 | `extended_above` | sma50 + 2×ATR. |
 | `breakdown_below` | sma100. |
+
+### How scores are calculated
+
+All thresholds live in `config/scoring.json`; the logic is in `engine/score.js`.
+
+1. **Input score (0–100):** each input has a rule `{bad, good}`. `bad` scores 0, `good` scores 100,
+   linear in between, clamped outside. `bad_above` makes a peak (RSI: best at 60, 0 at 85).
+   `nonpositive: "worst"` scores values ≤ 0 as 0; `"ignore"` treats them as missing.
+2. **Layer score:** whole-number average of the layer's available input scores. The layer is
+   missing (`null`) if fewer than `min_inputs` (default: half) have values, or its `gate`
+   fails (sentiment needs at least 3 articles).
+3. **Composite:** weighted average of layer scores, one decimal. One missing layer's weight is
+   spread over the others; more than `max_missing_layers` missing → `not_scored`.
+4. **Rating:** the first band in `ratings` whose `min` the composite reaches.
+5. **Flags:** `composite_jump` and `layer_jump:<layer>` when the change from the previous day's
+   history file reaches the `alerts` thresholds.
 
 ### Example
 
@@ -95,7 +111,7 @@ Each layer is `{ "score": 0–100, "inputs": { ... } }`.
       "rating": "Positive",
       "layers": {
         "trend":          { "score": 74, "inputs": { "price_vs_sma50_pct": 4.2, "sma50_slope_20d_pct": 1.8, "price_vs_sma100_pct": 9.5 } },
-        "momentum":       { "score": 61, "inputs": { "rsi14": 58.3, "return_20d_pct": 5.1, "macd_hist": 0.42 } },
+        "momentum":       { "score": 61, "inputs": { "rsi14": 58.3, "return_20d_pct": 5.1, "macd_hist_pct": 0.42 } },
         "risk":           { "score": 45, "inputs": { "atr14_pct": 3.1, "volatility_20d_pct": 42.0, "drawdown_from_high_pct": -6.4 } },
         "valuation":      { "score": 52, "inputs": { "ForwardPE": 30.0, "PEGRatio": 1.2, "EVToEBITDA": 25.0 } },
         "growth_quality": { "score": 88, "inputs": { "QuarterlyRevenueGrowthYOY": 0.60, "QuarterlyEarningsGrowthYOY": 0.55, "ProfitMargin": 0.50, "ReturnOnEquityTTM": 0.90, "avg_surprise_pct_4q": 5.0 } },

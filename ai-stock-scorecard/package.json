@@ -5,7 +5,7 @@
   "description": "Daily six-layer scorecard for an AI-focused stock watchlist",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test",
     "score": "node engine/score.js"
   }
 }

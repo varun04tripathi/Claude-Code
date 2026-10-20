@@ -5,47 +5,70 @@
       "weight": 0.20,
       "label": "Trend",
       "source": "TIME_SERIES_DAILY",
-      "inputs": ["price_vs_sma50_pct", "sma50_slope_20d_pct", "price_vs_sma100_pct"]
+      "inputs": {
+        "price_vs_sma50_pct":  { "bad": -10, "good": 10 },
+        "sma50_slope_20d_pct": { "bad": -5,  "good": 5 },
+        "price_vs_sma100_pct": { "bad": -15, "good": 15 }
+      }
     },
     "momentum": {
       "weight": 0.15,
       "label": "Momentum",
       "source": "TIME_SERIES_DAILY",
-      "inputs": ["rsi14", "return_20d_pct", "macd_hist"]
+      "inputs": {
+        "rsi14":          { "bad": 30,  "good": 60, "bad_above": 85 },
+        "return_20d_pct": { "bad": -15, "good": 15 },
+        "macd_hist_pct":  { "bad": -1,  "good": 1 }
+      }
     },
     "risk": {
       "weight": 0.15,
-      "label": "Risk (lower is better)",
+      "label": "Risk (higher score = lower risk)",
       "source": "TIME_SERIES_DAILY",
-      "inputs": ["atr14_pct", "volatility_20d_pct", "drawdown_from_high_pct"]
+      "inputs": {
+        "atr14_pct":              { "bad": 6,   "good": 1.5 },
+        "volatility_20d_pct":     { "bad": 80,  "good": 20 },
+        "drawdown_from_high_pct": { "bad": -35, "good": 0 }
+      }
     },
     "valuation": {
       "weight": 0.20,
       "label": "Valuation",
       "source": "OVERVIEW",
-      "inputs": ["ForwardPE", "PEGRatio", "EVToEBITDA"]
+      "inputs": {
+        "ForwardPE":  { "bad": 60, "good": 12,  "nonpositive": "worst" },
+        "PEGRatio":   { "bad": 3,  "good": 0.8, "nonpositive": "ignore" },
+        "EVToEBITDA": { "bad": 50, "good": 8,   "nonpositive": "worst" }
+      }
     },
     "growth_quality": {
       "weight": 0.20,
       "label": "Growth & Quality",
       "source": "OVERVIEW + EARNINGS",
-      "inputs": ["QuarterlyRevenueGrowthYOY", "QuarterlyEarningsGrowthYOY", "ProfitMargin", "ReturnOnEquityTTM", "avg_surprise_pct_4q"]
+      "min_inputs": 3,
+      "inputs": {
+        "QuarterlyRevenueGrowthYOY":  { "bad": -0.10, "good": 0.40 },
+        "QuarterlyEarningsGrowthYOY": { "bad": -0.20, "good": 0.50 },
+        "ProfitMargin":               { "bad": 0,     "good": 0.35 },
+        "ReturnOnEquityTTM":          { "bad": 0,     "good": 0.35 },
+        "avg_surprise_pct_4q":        { "bad": -10,   "good": 10 }
+      }
     },
     "sentiment": {
       "weight": 0.10,
       "label": "News Sentiment",
       "source": "NEWS_SENTIMENT",
-      "inputs": ["weighted_sentiment_7d", "article_count_7d"]
+      "gate": { "input": "article_count_7d", "min": 3 },
+      "inputs": {
+        "weighted_sentiment_7d": { "bad": -0.35, "good": 0.35 }
+      }
     }
   },
   "missing_layer_policy": "renormalize",
   "max_missing_layers": 1,
   "zones": {
-    "atr_period": 14,
-    "anchor": "sma50",
     "accumulate_atr_below": 1.0,
-    "extended_atr_above": 2.0,
-    "breakdown_anchor": "sma100"
+    "extended_atr_above": 2.0
   },
   "ratings": [
     { "min": 75, "label": "Strong",   "color": "pos-strong" },
